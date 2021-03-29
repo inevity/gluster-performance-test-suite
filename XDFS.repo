@@ -1,0 +1,5 @@
+[XDFSrepo]
+name=XDFS Repository
+baseurl=http://172.18.10.164/
+gpgcheck=0
+enabled=1

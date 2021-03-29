@@ -1,0 +1,49 @@
+[all:vars]
+#gluster_volumes=testvol
+#gluster_cluster_replica_count=3
+#gluster_cluster_disperse_count=3
+node0=ans1.tc.com
+#build="upstream"
+build="custom"
+#custom_build_url="https://download.gluster.org/pub/gluster/glusterfs/8/8.1/Fedora/fedora-32/x86_64/"
+custom_build_repo_url="http://172.18.10.164/XDFS.repo"
+#custom_build_path=/tmp/rpms/
+
+
+benchmarking_tools=0
+
+backend_variables=~/autodeploycluster/backend-vars.yaml
+cleanup_vars=~/autodeploycluster/cleanup-vars.yaml
+#rhsm_vars=~/config-for-cluster1/rhsm-vars.yml
+use_rhsm_repository=0
+
+tool="smallfile"
+download_results_at_location=~/config-for-cluster1/
+# if ansible control machine no ssh key ,then  set control_machine_username
+# control_machine_username=root
+
+#see other default  var in the ./group_vars/all/vars
+
+gateway=['192.168.1.1', '192.168.2.1',' 192.168.3.1']
+
+[control]
+control_machine ansible_host=127.0.0.1 ansible_connection=local
+
+[master_server]
+ans1.tc.com
+
+[master_client]
+ans4.tc.com 
+
+[cluster_servers]
+ans1.tc.com ips=['192.168.1.15', '192.168.2.15', '192.168.3.15']
+ans2.tc.com ips=['192.168.1.16', '192.168.2.16', '192.168.3.16']
+ans3.tc.com ips=['192.168.1.17', '192.168.2.17', '192.168.3.17']
+
+[cluster_clients]
+ans4.tc.com should_mount_from=ans1.tc.com ips=['192.168.1.18', '192.168.2.18', '192.168.3.18']
+
+
+[cluster_machines:children]
+cluster_servers
+cluster_clients

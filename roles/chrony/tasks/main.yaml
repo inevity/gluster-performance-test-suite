@@ -1,0 +1,50 @@
+# Install chrony if not already installed
+- name: Install chrony
+  package:
+    name: chrony
+    state: present
+  tags:
+    - chrony
+
+
+# Replace the servers at chrony configuration with better ones
+# todo: use server names
+- name: Setup cronyd files
+  lineinfile:
+    dest: /etc/chrony.conf
+    regex: '{{ item.regex }}'
+    line: '{{ item.line }}'
+    state: present
+  loop:
+    - { regex: '^server 0.*', line: 'server ntp.aliyun.com iburst' }
+    - { regex: '^server 1.*', line: 'server ntp1.aliyun.com iburst' }
+    - { regex: '^server 2.*', line: 'server ntp2.aliyun.com iburst' }
+    - { regex: '^server 3.*', line: 'server ntp3.aliyun.com iburst' }
+  tags:
+    - chrony
+
+# Allow computing nodes to synchronise with headnode through NTP
+#- name: Setup cronyd files
+#  lineinfile:
+#    dest: /etc/chrony.conf
+#    line: '{{ item }}'
+#    state: present
+#  loop:
+##    - 'allow {{ sms_network }}'
+#    - 'local stratum 10'
+#  tags:
+#    - chrony
+
+# Restart NTP service so modifications take effect
+- name: Restart and guarantee that chronyd is enabled
+  systemd:
+    name: chronyd
+    enabled: true
+    state: restarted
+  tags:
+    - chrony
+#- service:
+#    name: chrony
+#    enabled: yes
+#    state: restarted
+#

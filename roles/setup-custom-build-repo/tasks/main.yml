@@ -17,7 +17,7 @@
     enabled: yes
     gpgcheck: no
     keepalive: yes
-  when: ansible_distribution == "RedHat"
+  when: ansible_distribution == "RedHat" or ansible_distribution == "CentOS" 
 
 - name: Install wget
   yum:

@@ -17,7 +17,7 @@
     enabled: yes
     gpgcheck: no
     keepalive: yes
-  when: ansible_distribution == "RedHat"
+  when: ansible_distribution == "RedHat" or ansible_distribution == "CentOS" 
 
 - name: Configure Gluster devel nightly repo
   vars:
@@ -31,4 +31,4 @@
     gpgcheck: false
     repo_gpgcheck: false
     keepalive: yes
-  when: ansible_distribution == "RedHat"
+  when: ansible_distribution == "RedHat" or ansible_distribution == "CentOS" 

@@ -1,0 +1,55 @@
+---
+#- name: "Playbook to test the inventory_hostname and ansible_hostname"
+#  hosts: allhosts
+#  gather_facts: true
+#  tasks:
+#
+#   - name: What is my inventory_hostname
+#     debug: var={{inventory_hostname}}
+#
+#   - name: What is my ansible_hostname
+#     debug: var={{ansible_hostname}}
+
+- name: "aPlaybook to test the inventory_hostname and ansible_hostname"
+  hosts: allhosts
+  gather_facts: true
+  tasks:
+    - debug: var=inventory_hostname
+    - debug: var=ansible_hostname
+    - debug: var=hostvars
+    #- fail: msg: "FQDN variable is not set!"
+    #  when: fqdn|default(False) == False
+- name: "bPlaybook to test the inventory_hostname and ansible_hostname"
+  hosts: allhosts
+  gather_facts: true
+  vars:
+    net_mask: "{{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.netmask }}"
+  #vars:
+  #   ips={192.168.1.15,192.168.2.15,192.168.3.15}
+  roles:
+    # ip config ,hostname
+    - tests
+    # timesync
+    - chrony
+  
+
+
+##- name: Check for FQDN variable presence
+##  fail:
+##    msg: "FQDN variable is not set!"
+##  when: fqdn|default(False) == False
+#
+#
+#- name: Check for hostname variable presence
+#  fail:
+#    msg: "Hostname variable is not set!"
+#  when: fqdn|default(False) == False
+#
+#
+#- hostname: name={{ fqdn }}
+#
+#
+#- name: Re-gather facts
+#  action: setup
+#  when: inventory_hostname != fqdn
+#

@@ -1,0 +1,17 @@
+[all:vars]
+gateway=['192.168.1.1','192.168.2.1','192.168.3.1']
+netprefix=24
+glusterinf=eth1
+
+# ansible use:default interface or eth0 interface from dhcp ,need to convert to static
+pubif=eth0
+
+# default all interface start with eth.
+# all ips var below should assig to eth1-3
+
+
+#in group_vars/all
+[allhosts]
+ans1.tc.com ips=['192.168.1.15','192.168.2.15','192.168.3.15']
+#ans1.tc.com
+

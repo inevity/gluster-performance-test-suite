@@ -1,0 +1,245 @@
+---
+- name: Re-gather facts
+  action: setup
+  tags:
+    - test1
+- name: debug fact
+  debug: var=ansible_facts
+  tags:
+    - test
+
+- debug: var=inventory_hostname
+- debug: var=ansible_hostname
+- debug: var=hostname
+- debug: var=nodename
+- debug: var=fqdn
+  
+#- name: gather
+#  gather_facts: True
+#  gather_subset:
+#    - network
+#    - virtual
+
+#- name: Check for FQDN variable presence
+#  fail:
+#    msg: "FQDN variable is not set!"
+#  when: fqdn|default(False) == False
+#
+#
+#- name: Check for hostname variable presence
+#  fail:
+#    msg: "Hostname variable is not set!"
+#  when: fqdn|default(False) == False
+
+
+#- hostname: "{{ inventory_hostname }}" 
+
+- name: Set a hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}" 
+
+# should return, this time not change ...
+#
+#- name: add myself to /etc/hosts
+#  lineinfile:
+#    dest: /etc/hosts
+#    regexp: '^127\.0\.0\.1[ \t]+localhost'
+#    line: '127.0.0.1 localhost webserver'
+#    state: present
+
+#
+#- name: Re-gather facts
+#  action: setup
+#  when: inventory_hostname != fqdn
+
+- name: Re-gather facts
+  action: setup
+#- name: debug fact
+#  debug: var=ansible_facts
+- debug: var=inventory_hostname
+- debug: var=ansible_hostname
+- debug: var=hostname
+- debug: var=nodename
+- debug: var=fqdn
+
+# config all ip
+# first switch to static
+# then config other interface static
+# now this ip control by the parse_kickstart,we cannot to change it 
+- debug: var=hostvars
+  tags:
+    - test1
+- name: "switch dhcp to static for default or eth0 interface"
+  nmcli:
+    # inf get from ansible_default_ipv4
+    conn_name: "{{ pubif|default(ansible_default_ipv4.alias) }}"
+    ifname: "{{ pubif|default(ansible_default_ipv4.interface) }}"
+    type: ethernet
+    state: present
+    autoconnect: yes
+    dns4: "114.114.114.114"
+    #ip4: "{{ ansible_default_ipv4.address }}/ {{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.netmask }} | ipaddr('prefix') "
+    #ip4: "{{ ansible_default_ipv4.address }}/ {{ net_mask | ipaddr('prefix') }}"
+    ip4: "{{ ansible_default_ipv4.address }}/{{ net_mask | ipaddr('prefix') }}"
+    gw4: "{{ ansible_default_ipv4.gateway }}"
+  tags:
+    - test1
+
+- name: "fix static"
+  shell: nmcli con mod "{{ pubif|default(ansible_default_ipv4.interface) }}" ipv4.method manual
+  tags:
+    - test1
+
+
+- name: "Configuring eth"
+  nmcli:
+    #conn_name: "eth{{idx}}"
+    #ifname: "eth{{idx}}"
+    #conn_name: "eth{{idx}}"
+    conn_name: "eth{{ ansible_loop.index }}"
+    ifname: "eth{{ ansible_loop.index }}"
+    type: ethernet
+    state: present
+    autoconnect: yes
+    dns4: "114.114.114.114"
+    #ip4: "{{ item }}"
+    #ip4: "{{ ip }}/24"
+    ip4: "{{ ip }}/{{ netprefix }}"
+    #method4: manual
+    #gw4: "{{ mygateway }}"
+    #gw4: gateway{{idx}}
+    gw4: "{{ gateway[ansible_loop.index0] }}"
+  #loop: "{{ ips }}"
+  #loop: "{{ query('list', ips) }}"
+  loop: "{{ ips|regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b')|list }}"
+  loop_control:
+    loop_var:  ip
+    # default is item
+    #index_var: idx
+    extended: yes
+  tags:
+    - test
+
+- name: "fix static"
+  shell: nmcli con mod "eth{{ ansible_loop.index }}" ipv4.method manual
+  loop: "{{ ips|regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b')|list }}"
+  loop_control:
+    extended: yes
+  tags:
+    - test
+#- shell: nmcli con mod "System enp0s8" ipv4.method manual
+#- name: ansible bug fix for static ip
+#  replace:
+#     path: /etc/sysconfig/network-scripts/ifcfg-bonding
+#     regexp: 'BOOTPROTO=dhcp'
+#     replace: 'BOOTPROTO=static'
+#     backup: yes
+
+
+ #loop: "{{ ips }}"
+  #loop: "{{ lookup('ips', 'all', wantlist=True) }}"
+  #loop: "{{ query('ips', 'host_vars') }}"
+#- name: "Configuring eth"
+#  debug:
+#    #var="eth{{ ansible_loop.index }}"
+#    msg: 
+#    - "eth{{ ansible_loop.index }}"
+#    #- "{{ item }}"
+#    - "{{ ip }}"
+#    - "{{ ansible_loop }}"
+#
+#  #loop: "{{ query('list', 'ips') }}"
+#  #loop: "{{ query('list', ips) }}"
+#  # not list ,is "[,]"
+#  #loop: "{{ ips|list }}"
+#  #loop: "{{ ips|to_json|ipaddr }}"
+#  loop: "{{ ips|regex_findall('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b')|list }}"
+#
+#  #loop: "{{ lookup('string', ips).split(',') }}"
+#  #loop: "{{ lookup('list', ips, wantlist=True) }}"
+#
+#  # must not use the host_vars[ips],haven flatted var
+#  loop_control:
+#    loop_var:  ip
+#    extended: yes
+#  tags:
+#    - test
+
+
+
+#- name: "Configuring eth"
+#  debug:
+#    var="eth{{ ansible_loop.index }}"
+#  #loop: "{{ hostvars['ips'] }}"
+#  loop_control:
+#    extended: yes
+#  tags:
+#    - test
+
+# Idempotent way to build a /etc/hosts file with Ansible using your Ansible hosts inventory for a source.
+# Will include all hosts the playbook is run on.
+# Credits to rothgar: https://gist.github.com/rothgar/8793800
+#
+# for glusterfs hostname peer seting!!!
+#
+#- name: Build hosts file (backups will be made)
+#  lineinfile: >
+#    dest=/etc/hosts 
+#    regexp='{{ hostvars[item].ansible_hostname }}$' 
+#    line='{{ hostvars[item].ansible_default_ipv4.address }} {{ item }} {{ hostvars[item].ansible_hostname }}' 
+#    state=present 
+#    backup=yes
+#  when: hostvars[item].ansible_default_ipv4.address is defined
+#  with_items: groups['all']
+
+- name: Re-gather facts
+  action: setup
+  tags:
+    - testhosts
+- name: Build hosts file (backups will be made)
+#  vars:
+#    glusinf: "ansible_{{ glusterinf }}"
+#    res: "{{ hostvars[item][glusinf].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+    # must use [] as var 
+#  debug:
+#   # var=glusinf
+#    var=res
+    
+  lineinfile: 
+    path=/etc/hosts 
+    regexp='.*{{ item }}$' 
+    line="{{ hostvars[item][glusinf].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+    state=present 
+    backup=yes
+  loop: "{{ groups['all'] }}"
+  tags:
+    - testhosts
+
+- name: set timezone
+  timezone:
+    name: Asia/Shanghai
+  tags:
+    - timezone
+
+
+
+
+
+
+#####   " line="{{ hostvars[item]["ansible_{{ glusterinf }}"].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"a"
+    #line="{{ hostvars[item].ansible_eth1.ipv4.address }} {{ item }}" 
+    #line="{{ hostvars[item].ansible_{{ glusterinf }}.ipv4.address }} {{ item }}" 
+# when: "hostvars[item].ansible_{{ glusterinf }}.ipv4.address" is defined
+#  when: hostvars[item].ansible_{{ glusterfinf }}.ipv4.address is defined
+    #line="{{ hostvars[item].ansible_{{ glusterinf }}.ipv4.address }} {{item}}" 
+    #line=""{{ hostvars[item].ansible_eth1.ipv4.address }}"  "{{ item }}"" 
+    #line="{{ hostvars[item].ansible_eth1.ipv4.address }}  {{ item }}" 
+    # here item is ans1.tc.com
+    #line="{{ hostvars[item].ansible_{{ glusterinf }}.ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+
+    # line="{{ hostvars[item]."'ansible_' +  {{ glusterinf }}".ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+    #line="{{ hostvars[item]['"ansible_" ~ {{ glusterinf }}'].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+  # line="{{ hostvars[item].{{ glusinf }}.ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+    #regexp='{{ hostvars[item].ansible_hostname }}$' 
+    #line='{{ hostvars[item].ansible_{{ glusterinf }}.ipv4.address }} {{ item }} {{ hostvars[item].ansible_hostname }}' 
+# todo settimzone

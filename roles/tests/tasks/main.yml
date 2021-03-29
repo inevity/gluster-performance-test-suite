@@ -197,9 +197,9 @@
   tags:
     - testhosts
 - name: Build hosts file (backups will be made)
-#  vars:
-#    glusinf: "ansible_{{ glusterinf }}"
-#    res: "{{ hostvars[item][glusinf].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
+  vars:
+    glusinf: "ansible_{{ glusterinf }}"
+    res: "{{ hostvars[item][glusinf].ipv4.address }}  {{ item }} {{ hostvars[item]['ansible_hostname']}}"
     # must use [] as var 
 #  debug:
 #   # var=glusinf

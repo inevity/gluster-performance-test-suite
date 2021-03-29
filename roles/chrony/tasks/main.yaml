@@ -34,6 +34,13 @@
 #    - 'local stratum 10'
 #  tags:
 #    - chrony
+- name: Setup cronyd files
+  lineinfile:
+    dest: /etc/chrony.conf
+    line: 'local stratum 10'
+    state: present
+  tags:
+    - chrony
 
 # Restart NTP service so modifications take effect
 - name: Restart and guarantee that chronyd is enabled

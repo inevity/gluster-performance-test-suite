@@ -1,0 +1,237 @@
+---
+- name: Setup passwordless ssh from control machine to cluster
+  hosts: control
+  remote_user: root
+  roles:
+    - setup-control-machine-connectivity-to-cluster
+  tags:
+    - freshinstall
+
+# 1. umount client glusterfs, and delete vol, delete lv
+- name: Unmount glusterfs from clients
+  hosts: cluster_clients
+  remote_user: root
+  tasks:
+    - mount:
+        path: /gluster-mount
+        state: unmounted
+  tags:
+    - reset
+
+- name: Check if gluster is installed
+  hosts: cluster_servers
+  remote_user: root
+  tasks:
+    - shell: command -v gluster >/dev/null 2>&1
+      register: is_gluster_present
+      ignore_errors: yes
+    - debug: msg="{{ is_gluster_present.rc }}"
+  tags:
+    - reset
+
+- name: Cleanup delete gluster volume and lv
+  remote_user: root
+  hosts: cluster_servers
+  vars_files:
+    - "{{ cleanup_vars }}"
+  pre_tasks:
+    - name: Delete Gluster volume(s)
+      gluster_volume:
+         state: absent
+         name: "{{ item }}"
+      ignore_errors: yes
+      with_items: "{{ gluster_volumes }}"
+      run_once: true
+      when: is_gluster_present.rc|int == 0
+  roles:
+    - { role: gluster.infra, when: is_gluster_present.rc|int == 0 }
+  tags:
+    - reset
+
+
+# 2. setup gluster machines including server and clients, config and some pkg install 
+# other ip config without ansible ip, hostname, /etc/hosts for glusterfs peer , timezone,
+#do ntp/timezone/hostname/ip config 
+
+- name: Common setup on gluster machines
+  hosts: cluster_machines
+  remote_user: root
+  roles:
+    - common-setup
+  tags:
+    - freshinstall
+
+- name: ntp setup on gluster machines
+  hosts: cluster_machines
+  remote_user: root
+  roles:
+    - chrony
+  tags:
+    - freshinstall
+
+# 3. remove gluster and repo, reset machines to fresh status
+- name: Remove gluster and its repositories
+  hosts: cluster_machines
+  remote_user: root
+  roles:
+    - remove-gluster-and-its-repositories
+  tags:
+    - reset
+
+# 4. setup repo : upstream or rhsm or custom, and install start gluster with volume
+- name: Setup upstream repository
+  hosts: cluster_machines
+  remote_user: root
+  roles:
+    - { role: setup-upstream-repo, when: build == "upstream" }
+  tags:
+    - freshinstall2
+
+- name: Subscribe to RHSM
+  hosts: cluster_machines
+  remote_user: root
+  gather_facts: no
+  vars_files:
+    - "{{ rhsm_vars }}"
+  roles:
+    - { role: gluster.repos,  when: use_rhsm_repository|int == 1 }
+  tags:
+    - freshinstall2
+
+- name: Setup custom build repository
+  hosts: cluster_machines
+  remote_user: root
+  roles:
+    - { role: setup-custom-build-repo, when: build == "custom" }
+  tags:
+    - freshinstall2
+
+
+
+- name: Install and start glusterd
+  hosts: cluster_servers
+  remote_user: root
+  roles:
+    - install-and-start-gluster
+  tags:
+    - freshinstall2
+
+# 4. client setup: install gluserfr fuse and other pkg ,and set master_client if needed. 
+- name: Client specific setup on gluster machines
+  hosts: cluster_clients
+  remote_user: root
+  roles:
+    - gluster-client-setup
+  tags:
+    - freshinstall2
+
+# later is for the cluster lvm create and gluster volume create
+# 5. backend server setup and creat a gluster volume 
+- name: Setting up backend and creating a volume
+  remote_user: root
+  hosts: cluster_servers
+  vars_files:
+    - "{{ backend_variables }}"
+  vars:
+     # Firewall setup
+     gluster_infra_fw_ports:
+       - 2049/tcp
+       - 54321/tcp
+       - 5900/tcp
+       - 5900-6923/tcp
+       - 5666/tcp
+       - 16514/tcp
+     gluster_infra_fw_services:
+       - glusterfs
+       - samba
+
+     gluster_cluster_hosts: "{{ groups['cluster_servers'] }}"
+     gluster_cluster_status: absent
+     gluster_cluster_transport: 'tcp'
+     gluster_cluster_force: 'yes'
+     gluster_cluster_options:
+       diagnostics.count-fop-hits: 'on'
+       diagnostics.latency-measurement: 'on'
+       network.inode-lru-limit: '200000'
+       performance.md-cache-timeout: '600'
+       performance.cache-invalidation: 'on'
+       performance.stat-prefetch: 'on'
+       features.cache-invalidation-timeout: '600'
+       features.cache-invalidation: 'on'
+       nfs.disable: 'off'
+
+  pre_tasks:
+    - name: setting appropriate gluster options for smallfile
+      set_fact:
+        gluster_cluster_options: "{{ gluster_cluster_options | combine({'server.event-threads': '4', 'client.event-threads': '4', 'cluster.lookup-optimize': 'on'})}}"
+      when: tool == "smallfile"
+
+  roles:
+     - gluster.infra
+     - gluster.cluster
+  tags:
+    - freshinstall2
+
+# 6. client mount 
+- name: Mount gluster volume on all the clients
+  hosts: cluster_clients
+  remote_user: root
+  gather_facts: true
+  tasks:
+    - mount:
+        path: /gluster-mount
+        src: "{{ should_mount_from }}:/testvol"
+        fstype: glusterfs
+        state: mounted
+  tags:
+    - freshinstall2
+
+# 7. other tools and setup 
+
+- name: Install performance benchmarking tools
+  hosts: cluster_clients
+  remote_user: root
+  roles:
+    - { role: install-perf-benchmarking-tools, when: benchmarking_tools|int == 1 }
+  tags:
+    - perf
+
+- name: Execute perf test and get results
+  hosts: master_client
+  remote_user: root
+  environment:
+    CLIENT: "{{groups['cluster_clients']}}"
+  roles:
+    - execute-perf-and-get-results
+  tags:
+    - perf
+
+- name: Fetch pcplogs from all the machines
+  hosts: cluster_machines
+  remote_user: root
+  tasks:
+    - name: Find pcplogs
+      find :
+        paths: /var/log/pcp/pmlogger/
+        recurse: yes
+      register: files_to_copy
+
+    - name: Get pcplogs
+      fetch:
+        src: "{{ item.path }}"
+        dest: "{{ download_results_at_location }}/results/pcplogs"
+      with_items: "{{ files_to_copy.files }}"
+      ignore_errors: yes
+  tags:
+    - perf
+
+- name: delete the ssh key if specifically asked
+  hosts: control_machine
+  tasks:
+    - file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - ~/.ssh/id_rsa
+        - ~/.ssh/id_rsa.pub
+      when: delete_key is defined

@@ -14,7 +14,8 @@ benchmarking_tools=0
 
 backend_variables=~/autodeploycluster/backend-vars.yaml
 cleanup_vars=~/autodeploycluster/cleanup-vars.yaml
-#rhsm_vars=~/config-for-cluster1/rhsm-vars.yml
+
+rhsm_vars=~/autodeploycluster/rhsm-vars.yml
 use_rhsm_repository=0
 
 tool="smallfile"

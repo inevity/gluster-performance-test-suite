@@ -130,3 +130,32 @@
     - timezone
 
 
+- name: config repo base exclude 
+  #community.general.ini_file:
+  ini_file:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    section: base
+    option: exclude
+    value: "glusterfs*"
+    mode: '0600'
+    backup: yes
+
+- name: config repo base exclude 
+  #community.general.ini_file:
+  ini_file:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    section: updates
+    option: exclude
+    value: "glusterfs-*"
+    mode: '0600'
+    backup: yes
+
+# why no impact?
+- name: config repo epel exclude 
+  ini_file:
+    path: /etc/yum.repos.d/epel.repo
+    section: epel
+    option: exclude
+    value: "glusterfs-*"
+    mode: '0600'
+    backup: yes

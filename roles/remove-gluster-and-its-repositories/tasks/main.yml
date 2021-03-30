@@ -33,6 +33,7 @@
     - epel
     - gluster-nightly-devel
     - glusterlocal
+   #-todo CostumGluster
 
 - name: clean yum cache
   command: yum clean all

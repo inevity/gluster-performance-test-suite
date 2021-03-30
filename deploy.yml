@@ -108,22 +108,24 @@
 
 
 
+
 - name: Install and start glusterd
   hosts: cluster_servers
   remote_user: root
   roles:
     - install-and-start-gluster
   tags:
-    - freshinstall2
+    - freshinstall3
 
 # 4. client setup: install gluserfr fuse and other pkg ,and set master_client if needed. 
+#  updates must need disable or excloude glusterfs-*
 - name: Client specific setup on gluster machines
   hosts: cluster_clients
   remote_user: root
   roles:
     - gluster-client-setup
   tags:
-    - freshinstall2
+    - freshinstall3
 
 # later is for the cluster lvm create and gluster volume create
 # 5. backend server setup and creat a gluster volume 
@@ -170,7 +172,7 @@
      - gluster.infra
      - gluster.cluster
   tags:
-    - freshinstall2
+    - freshinstall4
 
 # 6. client mount 
 - name: Mount gluster volume on all the clients
@@ -184,7 +186,7 @@
         fstype: glusterfs
         state: mounted
   tags:
-    - freshinstall2
+    - freshinstall4
 
 # 7. other tools and setup 
 
